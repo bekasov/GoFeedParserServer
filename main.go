@@ -62,16 +62,18 @@ func GetResponse(rssFeeds []string, params InputParams) string {
 	}
 
 	var processResultChan chan ResultData = make(chan ResultData)
-	var processWaitHandler sync.WaitGroup
 
 	go func() { // !
 		downloadWaitHandler.Wait()
 		close(httpDataChan)
 	}()
 
+	var processWaitHandlers []*sync.WaitGroup
 	for webPageData := range httpDataChan {
+		var processWaitHandler sync.WaitGroup = *new(sync.WaitGroup)
 		processWaitHandler.Add(1)
 		go ParseFeedItems(webPageData.Content, params, &processWaitHandler, processResultChan)
+		processWaitHandlers = append(processWaitHandlers, &processWaitHandler)
 	}
 
 	var response strings.Builder
@@ -83,7 +85,9 @@ func GetResponse(rssFeeds []string, params InputParams) string {
 	//response.WriteString("<link>http://localhost/rss</link>")
 
 	go func() { // !
-		processWaitHandler.Wait()
+		for _, processWaitHandlerLoc := range processWaitHandlers {
+			processWaitHandlerLoc.Wait()
+		}
 		close(processResultChan)
 	}()
 

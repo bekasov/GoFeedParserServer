@@ -45,7 +45,7 @@ func ParseFeedItems(content string, params InputParams, processWaitHandler *sync
 				if err := xmlDecoder.DecodeElement(&currentFeedItem, &t); err != nil {
 					log.Println(err.Error())
 				} else {
-					processWaitHandler.Add(1) // !!!
+					processWaitHandler.Add(1)
 					go ProcessFeedItems(currentFeedItem, params, processWaitHandler, processResultChan)
 				}
 			}
