@@ -1,6 +1,9 @@
 package main
 
 import (
+	"example.org/uploader"
+	"example.org/parser"
+
 	"fmt"
 	"net/http"
 	"net/url"
@@ -13,14 +16,9 @@ import (
 var RssFeeds = []string {
 	"http://static.feed.rbc.ru/rbc/logical/footer/news.rss",
 	"https://lenta.ru/rss",
-	"http://tass.ru/rss/v2.xml",
+	//"http://tass.ru/rss/v2.xml",
 }
 
-type InputParams struct {
-	SearchString string
-	CaseSensitive bool
-	SortOutput bool
-}
 
 func main() {
 	http.HandleFunc("/", httpHandler)
@@ -28,13 +26,13 @@ func main() {
 }
 
 func httpHandler(w http.ResponseWriter, r *http.Request) {
-	var inputParams InputParams = GetInputParams(r.URL.Query())
+	var inputParams uploader.InputParams = GetInputParams(r.URL.Query())
 	response := GetResponse(RssFeeds, inputParams)
 	fmt.Fprintf(w, response)
 }
 
-func GetResponse(rssFeeds []string, params InputParams) string {
-	var resultChan <-chan ResultData = GetResultChan(rssFeeds, params)
+func GetResponse(rssFeeds []string, params uploader.InputParams) string {
+	var resultChan <-chan parser.ResultData = GetResultChan(rssFeeds, params)
 
 	var responseBuilder strings.Builder
 	responseBuilder.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
@@ -45,7 +43,7 @@ func GetResponse(rssFeeds []string, params InputParams) string {
 	//responseBuilder.WriteString("<link>http://localhost/rss</link>")
 
 	if params.SortOutput {
-		var allFeeds *ResultDataArray = new(ResultDataArray)
+		var allFeeds *parser.ResultDataArray = new(parser.ResultDataArray)
 		for itemData := range resultChan {
 			allFeeds.Add(itemData)
 		}
@@ -65,15 +63,15 @@ func GetResponse(rssFeeds []string, params InputParams) string {
 	return responseBuilder.String()
 }
 
-func GetResultChan(rssFeeds []string, params InputParams) <-chan ResultData {
-	var httpContentChan <-chan WebPageData = GetHttpContentChan(rssFeeds)
-	var result chan ResultData = make(chan ResultData)
+func GetResultChan(rssFeeds []string, params uploader.InputParams) <-chan parser.ResultData {
+	var httpContentChan <-chan uploader.WebPageData = GetHttpContentChan(rssFeeds)
+	var result chan parser.ResultData = make(chan parser.ResultData)
 	var processWaitHandlers []*sync.WaitGroup
 	go func() {
 		for webPageData := range httpContentChan {
 			var processWaitHandler sync.WaitGroup = sync.WaitGroup{}
 			processWaitHandler.Add(1)
-			go ParseFeedItems(webPageData.Content, params, &processWaitHandler, result)
+			go parser.ParseFeedItems("<url>", webPageData.Content, params, &processWaitHandler, result)
 			processWaitHandlers = append(processWaitHandlers, &processWaitHandler)
 		}
 
@@ -88,12 +86,12 @@ func GetResultChan(rssFeeds []string, params InputParams) <-chan ResultData {
 	return result
 }
 
-func GetHttpContentChan(rssFeeds []string) <-chan WebPageData {
+func GetHttpContentChan(rssFeeds []string) <-chan uploader.WebPageData {
 	var downloadWaitHandler sync.WaitGroup
-	var result = make(chan WebPageData)
+	var result = make(chan uploader.WebPageData)
 	for _, rssFeed := range rssFeeds {
 		downloadWaitHandler.Add(1)
-		go GetHttpContent(rssFeed, &downloadWaitHandler, result)
+		go uploader.GetHttpContent(rssFeed, &downloadWaitHandler, result)
 	}
 
 	go func() {
@@ -104,7 +102,7 @@ func GetHttpContentChan(rssFeeds []string) <-chan WebPageData {
 	return result
 }
 
-func GetInputParams(getValuesPairs url.Values) InputParams {
+func GetInputParams(getValuesPairs url.Values) uploader.InputParams {
 	var searchString string = getValuesPairs.Get("search")
 	var sortOutput bool
 	var sortOutputParsed error
@@ -117,7 +115,7 @@ func GetInputParams(getValuesPairs url.Values) InputParams {
 		searchString = strings.ToLower(searchString)
 	}
 
-	return InputParams{
+	return uploader.InputParams{
 		SearchString:  searchString,
 		CaseSensitive: caseSensitive,
 		SortOutput:    sortOutput,

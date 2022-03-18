@@ -1,4 +1,4 @@
-package main
+package uploader
 
 import (
 	"io/ioutil"
@@ -6,6 +6,12 @@ import (
 	"net/http"
 	"sync"
 )
+
+type InputParams struct {
+	SearchString  string
+	CaseSensitive bool
+	SortOutput    bool
+}
 
 type WebPageData struct {
 	Url     string
@@ -31,4 +37,3 @@ func GetHttpContent(url string, resultWaitHandler *sync.WaitGroup, resultChan ch
 	}
 	resultChan <- result
 }
-
